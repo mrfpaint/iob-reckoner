@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IOB Ready Reckoner - Sales Companion</title>
+<style>
+  :root{
+    --ink:#0B1F3A;--ink-soft:#1B3559;--gold:#C9A227;--gold-soft:#E8D9A0;
+    --paper:#F6F4EE;--card:#FFFFFF;--line:#E2DDD0;--green:#1E7A52;--green-soft:#E6F2EC;
+    --muted:#6A7585;--shadow:0 8px 30px rgba(11,31,58,.10);--radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;
+    background:var(--paper);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+  header{background:linear-gradient(135deg,var(--ink) 0%,var(--ink-soft) 100%);
+    color:#fff;padding:18px 22px;position:sticky;top:0;z-index:50;box-shadow:var(--shadow)}
+  .head-row{display:flex;align-items:center;gap:14px;max-width:1100px;margin:0 auto;flex-wrap:wrap}
+  .logo{width:46px;height:46px;border-radius:10px;background:var(--gold);display:grid;place-items:center;
+    color:var(--ink);font-weight:800;font-size:18px;letter-spacing:-1px;flex-shrink:0}
+  .brand h1{font-size:18px;font-weight:700;letter-spacing:.2px}
+  .brand p{font-size:12px;color:var(--gold-soft);font-weight:500}
+  .head-tag{margin-left:auto;font-size:11px;background:rgba(255,255,255,.12);padding:6px 12px;
+    border-radius:20px;border:1px solid rgba(255,255,255,.18)}
+  .head-tag.live{background:rgba(30,122,82,.35);border-color:rgba(120,220,170,.4)}
+  .head-tag.err{background:rgba(162,78,21,.4);border-color:rgba(240,160,120,.4)}
+  .tabs{display:flex;gap:6px;max-width:1100px;margin:16px auto 0;padding:0 22px;flex-wrap:wrap}
+  .tab{padding:11px 20px;border:none;background:transparent;color:var(--muted);font-size:14px;
+    font-weight:600;cursor:pointer;border-radius:10px 10px 0 0;border-bottom:3px solid transparent;transition:.2s}
+  .tab:hover{color:var(--ink)}
+  .tab.active{color:var(--ink);border-bottom-color:var(--gold);background:var(--card)}
+  main{max-width:1100px;margin:0 auto;padding:22px}
+  .panel{display:none;animation:fade .35s ease}
+  .panel.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:22px;box-shadow:var(--shadow)}
+  .card h2{font-size:16px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .card .sub{font-size:12px;color:var(--muted);margin-bottom:18px}
+  .pip{width:7px;height:18px;background:var(--gold);border-radius:3px;display:inline-block}
+  label{display:block;font-size:13px;font-weight:600;margin:14px 0 6px;color:var(--ink-soft)}
+  input,select{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:10px;
+    font-size:15px;background:#fff;color:var(--ink);transition:.15s;font-family:inherit}
+  input:focus,select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,162,39,.18)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .hint{font-size:11px;color:var(--muted);margin-top:5px}
+  .result{background:linear-gradient(160deg,#fff 0%,#FBFAF5 100%)}
+  .big{font-size:34px;font-weight:800;color:var(--green);letter-spacing:-1px;margin:2px 0}
+  .big.navy{color:var(--ink)}
+  .kv{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px dashed var(--line);font-size:14px}
+  .kv:last-child{border-bottom:none}
+  .kv span:first-child{color:var(--muted)}
+  .kv span:last-child{font-weight:700}
+  .badge{display:inline-block;background:var(--green-soft);color:var(--green);font-size:12px;
+    font-weight:700;padding:5px 11px;border-radius:20px;margin-bottom:10px}
+  .badge.gold{background:#FBF3D6;color:#8A6D12}
+  .placeholder{color:var(--muted);font-size:14px;text-align:center;padding:40px 10px}
+  .placeholder .ic{font-size:30px;display:block;margin-bottom:8px;opacity:.4}
+  .elig{margin-top:14px;padding:12px 14px;border-radius:10px;font-size:13px;font-weight:600}
+  .elig.ok{background:var(--green-soft);color:var(--green)}
+  .elig.warn{background:#FDEEE3;color:#A24E15}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th{background:var(--paper);font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+  td:last-child,th:last-child{text-align:right;font-weight:700}
+  tr:hover td{background:#FBFAF5}
+  footer{max-width:1100px;margin:10px auto 40px;padding:0 22px;font-size:11px;color:var(--muted);text-align:center;line-height:1.7}
+  .disc{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-top:8px}
+  .print-row{display:flex;gap:10px;margin-top:14px}
+  .btn-ghost{flex:1;padding:11px;border:1px solid var(--line);background:#fff;border-radius:10px;
+    font-size:13px;font-weight:600;cursor:pointer;color:var(--ink-soft)}
+  .btn-ghost:hover{border-color:var(--gold);color:var(--ink)}
+  @media print{header .head-tag,.tabs,.print-row,footer .disc{display:none}body{background:#fff}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="head-row">
+    <div class="logo">IOB</div>
+    <div class="brand">
+      <h1>Ready Reckoner</h1>
+      <p>Indian Overseas Bank - Sales Companion</p>
+    </div>
+    <div class="head-tag" id="status">Loading rates...</div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('fd',this)">Fixed Deposit</button>
+    <button class="tab" onclick="showTab('loan',this)">Loan &amp; EMI</button>
+    <button class="tab" onclick="showTab('savings',this)">Savings A/C</button>
+    <button class="tab" onclick="showTab('rates',this)">Rate Card</button>
+  </div>
+</header>
+
+<main>
+  <section id="fd" class="panel active">
+    <div class="grid">
+      <div class="card">
+        <h2><span class="pip"></span> Prospect details</h2>
+        <p class="sub">Enter what the customer tells you. The reckoner does the maths.</p>
+        <label>Customer age (years)</label>
+        <input type="number" id="fdAge" placeholder="e.g. 42" oninput="calcFD()">
+        <div class="hint">60+ gets +0.50% (senior). 80+ gets +0.75% (super senior).</div>
+        <label>Deposit amount (Rs.)</label>
+        <input type="number" id="fdAmt" placeholder="e.g. 200000" oninput="calcFD()">
+        <label>Tenure</label>
+        <select id="fdTenure" onchange="calcFD()"></select>
+        <label>Payout type</label>
+        <select id="fdPayout" onchange="calcFD()">
+          <option value="cumulative">Cumulative (reinvest - compounds quarterly)</option>
+          <option value="simple">Monthly/Quarterly payout (simple)</option>
+        </select>
+      </div>
+      <div class="card result" id="fdResult">
+        <div class="placeholder"><span class="ic">Rs.</span>Fill in the prospect's details to see their maturity value and earnings.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="loan" class="panel">
+    <div class="grid">
+      <div class="card">
+        <h2><span class="pip"></span> Loan enquiry</h2>
+        <p class="sub">Pick the product, enter income &amp; amount, get EMI + eligibility instantly.</p>
+        <label>Loan product</label>
+        <select id="lnType" onchange="calcLoan()"></select>
+        <div class="row">
+          <div><label>Customer age</label><input type="number" id="lnAge" placeholder="e.g. 35" oninput="calcLoan()"></div>
+          <div><label>Net monthly income (Rs.)</label><input type="number" id="lnIncome" placeholder="e.g. 60000" oninput="calcLoan()"></div>
+        </div>
+        <label>Loan amount required (Rs.)</label>
+        <input type="number" id="lnAmt" placeholder="e.g. 2500000" oninput="calcLoan()">
+        <label>Tenure (years)</label>
+        <select id="lnTenure" onchange="calcLoan()">
+          <option value="3">3 years</option><option value="5">5 years</option>
+          <option value="7">7 years</option><option value="10">10 years</option>
+          <option value="15" selected>15 years</option><option value="20">20 years</option>
+          <option value="30">30 years</option>
+        </select>
+        <label>Existing monthly EMIs / obligations (Rs.)</label>
+        <input type="number" id="lnOblig" placeholder="e.g. 0" value="0" oninput="calcLoan()">
+        <div class="hint">Helps check if the new EMI fits within a safe limit of income.</div>
+      </div>
+      <div class="card result" id="lnResult">
+        <div class="placeholder"><span class="ic">[H]</span>Enter the loan details to calculate EMI, total interest and eligibility.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="savings" class="panel">
+    <div class="grid">
+      <div class="card">
+        <h2><span class="pip"></span> Savings account fit</h2>
+        <p class="sub">Recommend the right savings product for the prospect.</p>
+        <label>Customer age</label>
+        <input type="number" id="svAge" placeholder="e.g. 30" oninput="calcSavings()">
+        <label>Expected average balance (Rs.)</label>
+        <input type="number" id="svBal" placeholder="e.g. 75000" oninput="calcSavings()">
+        <label>Customer profile</label>
+        <select id="svProfile" onchange="calcSavings()">
+          <option value="general">General / Salaried</option>
+          <option value="senior">Senior Citizen</option>
+          <option value="student">Student / Young saver</option>
+          <option value="women">Women</option>
+        </select>
+      </div>
+      <div class="card result" id="svResult">
+        <div class="placeholder"><span class="ic">[C]</span>Enter the prospect's details to get a recommended account and projected interest.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="rates" class="panel">
+    <div class="card">
+      <h2><span class="pip"></span> Quick rate card</h2>
+      <p class="sub">Live from the rate Sheet - updates the moment Marketing edits it.</p>
+      <span class="badge gold">Fixed Deposit (general public)</span>
+      <table id="fdRateTable"><tr><th>Tenure</th><th>General</th><th>Senior (+0.50%)</th></tr></table>
+      <span class="badge" style="margin-top:22px">Loan products (indicative, floating)</span>
+      <table id="loanRateTable"><tr><th>Product</th><th>From</th><th>Max tenure</th></tr></table>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="disc">
+    <strong>Demo prototype.</strong> Rates load live from a Google Sheet maintained by Marketing.
+    Figures are indicative and <strong>not</strong> official IOB published rates. All results are estimates for
+    discussion only and do not constitute a sanction, commitment, or financial advice. Final rates and eligibility are decided by the Bank.
+  </div>
+</footer>
+
+<script>
+/* ============================================================
+   PASTE YOUR PUBLISHED CSV LINKS HERE
+   File > Share > Publish to web > pick tab > CSV > Publish > copy link
+   ============================================================ */
+var CSV = {
+  fd:      "https://docs.google.com/spreadsheets/d/e/2PACX-1vQp4KbaiM1dxwNt-7LOT44NXca7WkcYXG3ppVUaQcfsvs5NSaYIeRiUtcl3Cg7FTQrZyrWX4CEDSb_f/pub?gid=60400712&single=true&output=csv",
+  loan:    "https://docs.google.com/spreadsheets/d/e/2PACX-1vQp4KbaiM1dxwNt-7LOT44NXca7WkcYXG3ppVUaQcfsvs5NSaYIeRiUtcl3Cg7FTQrZyrWX4CEDSb_f/pub?gid=1475373464&single=true&output=csv",
+  savings: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQp4KbaiM1dxwNt-7LOT44NXca7WkcYXG3ppVUaQcfsvs5NSaYIeRiUtcl3Cg7FTQrZyrWX4CEDSb_f/pub?gid=1374664192&single=true&output=csv"
+};
+
+/* ---- Fallback rates (used if Sheet not reachable) ---- */
+var fdRates = [
+  {key:'0.125',label:'46-90 days',rate:4.50},
+  {key:'0.5',label:'6 months',rate:5.50},
+  {key:'1',label:'1 year',rate:6.50},
+  {key:'1.216',label:'444 days (Special - best rate)',rate:6.75},
+  {key:'2',label:'2 years',rate:6.50},
+  {key:'3',label:'3 years',rate:6.50},
+  {key:'5',label:'5 years (Tax Saver eligible)',rate:6.25}
+];
+var loanInfo = [
+  {type:'home',name:'Home Loan (Subha Gruha)',rate:8.65,maxTenure:30,maxAge:70},
+  {type:'car',name:'Car / Vehicle Loan (Pushpaka)',rate:8.80,maxTenure:7,maxAge:70},
+  {type:'personal',name:'Personal Loan',rate:10.50,maxTenure:7,maxAge:60},
+  {type:'lap',name:'Loan Against Property',rate:10.50,maxTenure:15,maxAge:65}
+];
+var savRate = 2.50;
+
+function fmt(n){ return 'Rs.' + Math.round(n).toLocaleString('en-IN'); }
+
+/* ---- tiny CSV parser ---- */
+function parseCSV(text){
+  var rows = text.trim().split(/\r?\n/).map(function(r){
+    var out=[], cur='', q=false;
+    for(var i=0;i<r.length;i++){
+      var c=r[i];
+      if(c==='"'){ q=!q; }
+      else if(c===',' && !q){ out.push(cur); cur=''; }
+      else { cur+=c; }
+    }
+    out.push(cur);
+    return out.map(function(s){ return s.trim(); });
+  });
+  var head=rows.shift();
+  return rows.filter(function(r){ return r.length>1 || r[0]!==''; }).map(function(r){
+    var o={};
+    head.forEach(function(h,i){ o[h]=r[i]; });
+    return o;
+  });
+}
+
+function loadRates(){
+  var st=document.getElementById('status');
+  var ready = Object.keys(CSV).every(function(k){ return CSV[k] && CSV[k].indexOf('PASTE_')!==0; });
+  if(!ready){
+    st.textContent='Demo rates (Sheet not connected)';
+    st.className='head-tag';
+    buildUI(); return;
+  }
+  Promise.all([
+    fetch(CSV.fd).then(function(r){return r.text();}),
+    fetch(CSV.loan).then(function(r){return r.text();}),
+    fetch(CSV.savings).then(function(r){return r.text();})
+  ]).then(function(res){
+    var fd=parseCSV(res[0]), ln=parseCSV(res[1]), sv=parseCSV(res[2]);
+    if(fd.length) fdRates = fd.map(function(r){ return {key:r.key,label:r.label,rate:+r.rate}; });
+    if(ln.length) loanInfo = ln.map(function(r){ return {type:r.type,name:r.name,rate:+r.rate,maxTenure:+r.maxTenure,maxAge:+r.maxAge}; });
+    var sr=sv.find(function(r){ return r.key==='rate'; });
+    if(sr) savRate=+sr.value;
+    st.textContent='Live rates';
+    st.className='head-tag live';
+    buildUI();
+  }).catch(function(e){
+    st.textContent='Sheet unreachable - using demo rates';
+    st.className='head-tag err';
+    buildUI();
+  });
+}
+
+function buildUI(){
+  var fdSel=document.getElementById('fdTenure');
+  fdSel.innerHTML=fdRates.map(function(r){
+    return '<option value="'+r.key+'" '+(r.key==='1.216'?'selected':'')+'>'+r.label+'</option>';
+  }).join('');
+  var lnSel=document.getElementById('lnType');
+  lnSel.innerHTML=loanInfo.map(function(l){
+    return '<option value="'+l.type+'">'+l.name+'</option>';
+  }).join('');
+  document.getElementById('fdRateTable').innerHTML=
+    '<tr><th>Tenure</th><th>General</th><th>Senior (+0.50%)</th></tr>'+
+    fdRates.map(function(r){
+      return '<tr><td>'+r.label+'</td><td>'+r.rate.toFixed(2)+'%</td><td>'+(r.rate+0.5).toFixed(2)+'%</td></tr>';
+    }).join('');
+  document.getElementById('loanRateTable').innerHTML=
+    '<tr><th>Product</th><th>From</th><th>Max tenure</th></tr>'+
+    loanInfo.map(function(l){
+      return '<tr><td>'+l.name+'</td><td>'+l.rate.toFixed(2)+'%</td><td>'+l.maxTenure+' yrs</td></tr>';
+    }).join('');
+  calcFD();
+}
+
+function showTab(id, el){
+  var panels=document.querySelectorAll('.panel');
+  for(var i=0;i<panels.length;i++) panels[i].classList.remove('active');
+  var tabs=document.querySelectorAll('.tab');
+  for(var j=0;j<tabs.length;j++) tabs[j].classList.remove('active');
+  document.getElementById(id).classList.add('active');
+  el.classList.add('active');
+}
+
+function seniorBump(age){ if(age>=80) return 0.75; if(age>=60) return 0.50; return 0; }
+
+function calcFD(){
+  var age=+document.getElementById('fdAge').value;
+  var amt=+document.getElementById('fdAmt').value;
+  var tKey=document.getElementById('fdTenure').value;
+  var tYears=+tKey;
+  var payout=document.getElementById('fdPayout').value;
+  var box=document.getElementById('fdResult');
+  var rec=fdRates.find(function(r){ return r.key===tKey; })||fdRates[0];
+  if(!amt||amt<1000){
+    box.innerHTML='<div class="placeholder"><span class="ic">Rs.</span>Enter a deposit of Rs.1,000 or more to calculate.</div>';
+    return;
+  }
+  var bump=age?seniorBump(age):0;
+  var rate=rec.rate+bump;
+  var maturity,interest;
+  if(payout==='cumulative'){ var n=4,r=rate/100; maturity=amt*Math.pow(1+r/n,n*tYears); interest=maturity-amt; }
+  else{ interest=amt*(rate/100)*tYears; maturity=amt+interest; }
+  var bumpNote = bump===0.75?'<div class="badge">Super Senior &middot; +0.75% applied</div>'
+    : bump===0.50?'<div class="badge">Senior Citizen &middot; +0.50% applied</div>'
+    : '<div class="badge gold">General public rate</div>';
+  box.innerHTML=bumpNote+
+    '<div class="kv"><span>Maturity value</span><span></span></div>'+
+    '<div class="big">'+fmt(maturity)+'</div>'+
+    '<div class="kv"><span>Principal</span><span>'+fmt(amt)+'</span></div>'+
+    '<div class="kv"><span>Interest earned</span><span style="color:var(--green)">'+fmt(interest)+'</span></div>'+
+    '<div class="kv"><span>Applicable rate</span><span>'+rate.toFixed(2)+'% p.a.</span></div>'+
+    '<div class="kv"><span>Tenure</span><span>'+rec.label+'</span></div>'+
+    '<div class="kv"><span>Payout</span><span>'+(payout==='cumulative'?'Cumulative (compounded)':'Simple payout')+'</span></div>'+
+    '<div class="print-row"><button class="btn-ghost" onclick="window.print()">Print / Save PDF</button></div>';
+}
+
+function calcLoan(){
+  var type=document.getElementById('lnType').value;
+  var age=+document.getElementById('lnAge').value;
+  var income=+document.getElementById('lnIncome').value;
+  var P=+document.getElementById('lnAmt').value;
+  var yrs=+document.getElementById('lnTenure').value;
+  var obligation=+document.getElementById('lnOblig').value||0;
+  var box=document.getElementById('lnResult');
+  var info=loanInfo.find(function(l){ return l.type===type; })||loanInfo[0];
+  if(!P||P<10000){
+    box.innerHTML='<div class="placeholder"><span class="ic">[H]</span>Enter a loan amount to calculate the EMI.</div>';
+    return;
+  }
+  var r=info.rate/100/12, n=yrs*12;
+  var emi=P*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1);
+  var total=emi*n, interest=total-P;
+  var eligBlock='';
+  if(income){
+    var safeEmi=income*0.50-obligation;
+    var ratio=(emi/income)*100;
+    if(emi<=safeEmi){
+      eligBlock='<div class="elig ok">Comfortable fit - EMI is '+ratio.toFixed(0)+'% of net income. Within safe limit.</div>';
+    } else {
+      var maxEmi=Math.max(income*0.50-obligation,0);
+      var maxLoan=maxEmi>0?maxEmi*(Math.pow(1+r,n)-1)/(r*Math.pow(1+r,n)):0;
+      eligBlock='<div class="elig warn">EMI is '+ratio.toFixed(0)+'% of income - above the safe ~50% limit. Eligible loan at this tenure approx <strong>'+fmt(maxLoan)+'</strong>.</div>';
+    }
+  }
+  var ageNote='';
+  if(age){
+    var endAge=age+yrs;
+    if(endAge>info.maxAge){
+      ageNote='<div class="elig warn">Loan ends at age '+endAge+'. This product should close by age '+info.maxAge+' - reduce tenure.</div>';
+    }
+  }
+  box.innerHTML='<div class="badge gold">'+info.name+'</div>'+
+    '<div class="kv"><span>Monthly EMI</span><span></span></div>'+
+    '<div class="big navy">'+fmt(emi)+'</div>'+
+    '<div class="kv"><span>Loan amount</span><span>'+fmt(P)+'</span></div>'+
+    '<div class="kv"><span>Interest rate</span><span>'+info.rate.toFixed(2)+'% p.a.</span></div>'+
+    '<div class="kv"><span>Tenure</span><span>'+yrs+' years ('+n+' EMIs)</span></div>'+
+    '<div class="kv"><span>Total interest</span><span style="color:#A24E15">'+fmt(interest)+'</span></div>'+
+    '<div class="kv"><span>Total repayment</span><span>'+fmt(total)+'</span></div>'+
+    eligBlock+ageNote+
+    '<div class="print-row"><button class="btn-ghost" onclick="window.print()">Print / Save PDF</button></div>';
+}
+
+function calcSavings(){
+  var age=+document.getElementById('svAge').value;
+  var bal=+document.getElementById('svBal').value;
+  var profile=document.getElementById('svProfile').value;
+  var box=document.getElementById('svResult');
+  if(!bal){
+    box.innerHTML='<div class="placeholder"><span class="ic">[C]</span>Enter an expected balance to get a recommendation.</div>';
+    return;
+  }
+  var annualInt=bal*savRate/100;
+  var rec,why;
+  if(age>=60||profile==='senior'){ rec='IOB Senior Citizen Savings'; why='Extra benefits and priority service for 60+.'; }
+  else if(profile==='student'){ rec='IOB Student / Basic Savings'; why='Zero/low minimum balance, ideal for young savers.'; }
+  else if(profile==='women'){ rec='IOB Mahila / Women Savings'; why='Tailored benefits for women customers.'; }
+  else if(bal>=50000){ rec='IOB Freedom Savings (Sweep-in)'; why='Balance above Rs.50,000 auto-sweeps to FD for higher returns.'; }
+  else{ rec='IOB Regular Savings'; why='Standard account with full digital banking.'; }
+  box.innerHTML='<div class="badge">Recommended</div>'+
+    '<div class="big navy" style="font-size:24px">'+rec+'</div>'+
+    '<p class="sub" style="margin:6px 0 14px">'+why+'</p>'+
+    '<div class="kv"><span>Savings rate (indicative)</span><span>'+savRate.toFixed(2)+'% p.a.</span></div>'+
+    '<div class="kv"><span>Est. annual interest</span><span style="color:var(--green)">'+fmt(annualInt)+'</span></div>'+
+    '<div class="kv"><span>On avg. balance</span><span>'+fmt(bal)+'</span></div>'+
+    (bal>=50000?'<div class="elig ok">Tip: pitch the sweep-in facility - idle balance earns FD-level returns.</div>':'')+
+    '<div class="print-row"><button class="btn-ghost" onclick="window.print()">Print / Save PDF</button></div>';
+}
+
+loadRates();
+</script>
+</body>
+</html>
