@@ -74,6 +74,20 @@
   .btn-ghost:hover{border-color:var(--gold);color:var(--ink)}
   @media print{header .head-tag,.tabs,.print-row,footer .disc{display:none}body{background:#fff}#splash{display:none!important}}
 
+  /* ===== LOAN COMPARISON CARDS ===== */
+  .loan-compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:6px 0 4px}
+  @media(max-width:480px){.loan-compare{grid-template-columns:1fr}}
+  .lc-card{border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center;background:#fff}
+  .lc-card.lc-best{border-color:var(--green);background:linear-gradient(160deg,#fff,#F1F8F3);
+    box-shadow:0 6px 18px rgba(30,122,82,.14)}
+  .lc-tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+  .lc-best .lc-tag{color:var(--green)}
+  .lc-rate{font-size:13px;font-weight:700;color:var(--ink-soft);margin:4px 0 8px}
+  .lc-emi{font-size:26px;font-weight:800;letter-spacing:-1px;color:var(--ink)}
+  .lc-best .lc-emi{color:var(--green)}
+  .lc-sub{font-size:11px;color:var(--muted);margin-top:-2px}
+  .lc-int{font-size:11px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+
   /* ===== SPLASH / WELCOME SCREEN ===== */
   #splash{position:fixed;inset:0;z-index:9999;overflow:hidden;
     display:flex;align-items:center;justify-content:center;
@@ -214,6 +228,30 @@
           <div><label>Customer age</label><input type="number" id="lnAge" placeholder="e.g. 35" oninput="calcLoan()"></div>
           <div><label>Net monthly income (Rs.)</label><input type="number" id="lnIncome" placeholder="e.g. 60000" oninput="calcLoan()"></div>
         </div>
+        <label>Employment type</label>
+        <select id="lnEmp" onchange="calcLoan()">
+          <option value="salaried">Salaried</option>
+          <option value="business">Business / Self-employed</option>
+        </select>
+        <div class="hint">Car loan: salaried customers must close the loan by age 60.</div>
+
+        <div id="carBlock" style="display:none">
+          <div class="row">
+            <div>
+              <label>CIBIL score</label>
+              <input type="number" id="lnCibil" placeholder="e.g. 780" oninput="calcLoan()">
+            </div>
+            <div>
+              <label>Vehicle type</label>
+              <select id="lnEv" onchange="calcLoan()">
+                <option value="nonev">Non-Electric</option>
+                <option value="ev">Electric Vehicle</option>
+              </select>
+            </div>
+          </div>
+          <div class="hint">Enter the score to auto-apply the CIBIL-band rate from the IOB car loan grid.</div>
+        </div>
+
         <label>Loan amount required (Rs.)</label>
         <input type="number" id="lnAmt" placeholder="e.g. 2500000" oninput="calcLoan()">
         <label>Tenure (years)</label>
@@ -226,6 +264,9 @@
         <label>Existing monthly EMIs / obligations (Rs.)</label>
         <input type="number" id="lnOblig" placeholder="e.g. 0" value="0" oninput="calcLoan()">
         <div class="hint">Helps check if the new EMI fits within a safe limit of income.</div>
+        <label>Override ROI manually (% p.a.) &mdash; optional</label>
+        <input type="number" id="lnRoi" step="0.05" placeholder="e.g. 8.40" oninput="calcLoan()">
+        <div class="hint">Overrides everything above, including any auto CIBIL rate. Leave blank to use the standard / CIBIL rate.</div>
       </div>
       <div class="card result" id="lnResult">
         <div class="placeholder"><span class="ic">[H]</span>Enter the loan details to calculate EMI, total interest and eligibility.</div>
@@ -304,6 +345,25 @@ var loanInfo = [
   {type:'lap',name:'Loan Against Property',rate:10.50,maxTenure:15,maxAge:65}
 ];
 var savRate = 2.50;
+
+/* ---- IOB Car Loan CIBIL grid (from official rate chart) ---- */
+var cibilGrid = [
+  {band:'CIC-1', min:800, max:900, ev:7.55, nonev:7.60, label:'CIC-1 (800+)'},
+  {band:'CIC-2', min:775, max:799, ev:7.60, nonev:7.65, label:'CIC-2 (775-799)'},
+  {band:'CIC-3', min:750, max:774, ev:7.65, nonev:7.70, label:'CIC-3 (750-774)'},
+  {band:'CIC-4', min:725, max:749, ev:7.70, nonev:7.75, label:'CIC-4 (725-749) & NTC'},
+  {band:'CIC-5', min:700, max:724, ev:7.80, nonev:7.85, label:'CIC-5 (700-724)'},
+  {band:'CIC-6', min:680, max:699, ev:8.55, nonev:8.60, label:'CIC-6 (680-699)'}
+];
+var CAR_MAX_MONTHS = 84;      // 84 months max repayment
+var CAR_SALARIED_MAX_AGE = 60; // salaried must close by 60
+
+function cibilBand(score){
+  for(var i=0;i<cibilGrid.length;i++){
+    if(score>=cibilGrid[i].min && score<=cibilGrid[i].max) return cibilGrid[i];
+  }
+  return null; // below 680 or invalid -> not in published grid
+}
 
 function fmt(n){ return 'Rs.' + Math.round(n).toLocaleString('en-IN'); }
 
@@ -420,51 +480,161 @@ function calcFD(){
     '<div class="print-row"><button class="btn-ghost" onclick="window.print()">Print / Save PDF</button></div>';
 }
 
+function emiCalc(P, annualRate, n){
+  var r=annualRate/100/12;
+  if(r===0){ var e=P/n; return {emi:e,total:P,interest:0}; }
+  var emi=P*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1);
+  var total=emi*n;
+  return {emi:emi,total:total,interest:total-P};
+}
+
 function calcLoan(){
   var type=document.getElementById('lnType').value;
   var age=+document.getElementById('lnAge').value;
   var income=+document.getElementById('lnIncome').value;
+  var emp=document.getElementById('lnEmp').value;
   var P=+document.getElementById('lnAmt').value;
   var yrs=+document.getElementById('lnTenure').value;
   var obligation=+document.getElementById('lnOblig').value||0;
+  var roiRaw=document.getElementById('lnRoi').value;
+  var roi=parseFloat(roiRaw);
+  var hasRoi=roiRaw!=='' && !isNaN(roi) && roi>0;
   var box=document.getElementById('lnResult');
   var info=loanInfo.find(function(l){ return l.type===type; })||loanInfo[0];
+  var isCar = (type==='car');
+
+  // show/hide the CIBIL block only for car loans
+  document.getElementById('carBlock').style.display = isCar ? 'block' : 'none';
+
+  var cibil=+document.getElementById('lnCibil').value;
+  var isEv=document.getElementById('lnEv').value==='ev';
+
   if(!P||P<10000){
     box.innerHTML='<div class="placeholder"><span class="ic">[H]</span>Enter a loan amount to calculate the EMI.</div>';
     return;
   }
-  var r=info.rate/100/12, n=yrs*12;
-  var emi=P*r*Math.pow(1+r,n)/(Math.pow(1+r,n)-1);
-  var total=emi*n, interest=total-P;
+
+  var n=yrs*12;
+  var warnings='';
+
+  /* ---------- CAR LOAN RULES ---------- */
+  var band=null, cibilRate=null;
+  if(isCar){
+    // max 84 months
+    if(n>CAR_MAX_MONTHS){
+      warnings+='<div class="elig warn">Car loan maximum repayment is '+CAR_MAX_MONTHS+' months (7 years). Tenure capped at 7 years for this calculation.</div>';
+      n=CAR_MAX_MONTHS; yrs=CAR_MAX_MONTHS/12;
+    }
+    // salaried must close by 60
+    if(age && emp==='salaried'){
+      var endAge=age + (n/12);
+      if(endAge>CAR_SALARIED_MAX_AGE){
+        var allowedYrs=CAR_SALARIED_MAX_AGE-age;
+        if(allowedYrs<=0){
+          warnings+='<div class="elig warn">Salaried customer is already '+age+'. Car loan for salaried must close by age '+CAR_SALARIED_MAX_AGE+' - not eligible. A business/self-employed customer may still qualify.</div>';
+        } else {
+          warnings+='<div class="elig warn">Salaried customer: loan would end at age '+Math.round(endAge)+'. Must close by '+CAR_SALARIED_MAX_AGE+' - maximum tenure here is <strong>'+allowedYrs+' year(s)</strong>. (Business customers are not bound by this.)</div>';
+        }
+      }
+    }
+    // CIBIL-based rate
+    if(cibil){
+      band=cibilBand(cibil);
+      if(band){
+        cibilRate = isEv ? band.ev : band.nonev;
+      } else {
+        warnings+='<div class="elig warn">CIBIL '+cibil+' is outside the published grid (680 and above). Refer to the branch for pricing.</div>';
+      }
+    }
+  }
+
+  /* ---------- rate selection ----------
+     priority: manual override > CIBIL auto rate > standard card rate  */
+  var stdRate = info.rate;
+  var offerRate = hasRoi ? roi : (cibilRate!==null ? cibilRate : null);
+  var offerLabel = hasRoi ? 'Manual override'
+                 : (cibilRate!==null ? (band.label + (isEv?' - EV':' - Non-EV')) : '');
+
+  var base=emiCalc(P, stdRate, n);
+  var eligRate = offerRate!==null ? offerRate : stdRate;
+  var eligEmi = emiCalc(P, eligRate, n).emi;
+
   var eligBlock='';
   if(income){
     var safeEmi=income*0.50-obligation;
-    var ratio=(emi/income)*100;
-    if(emi<=safeEmi){
+    var ratio=(eligEmi/income)*100;
+    if(eligEmi<=safeEmi){
       eligBlock='<div class="elig ok">Comfortable fit - EMI is '+ratio.toFixed(0)+'% of net income. Within safe limit.</div>';
     } else {
       var maxEmi=Math.max(income*0.50-obligation,0);
-      var maxLoan=maxEmi>0?maxEmi*(Math.pow(1+r,n)-1)/(r*Math.pow(1+r,n)):0;
+      var rr=eligRate/100/12;
+      var maxLoan=maxEmi>0?maxEmi*(Math.pow(1+rr,n)-1)/(rr*Math.pow(1+rr,n)):0;
       eligBlock='<div class="elig warn">EMI is '+ratio.toFixed(0)+'% of income - above the safe ~50% limit. Eligible loan at this tenure approx <strong>'+fmt(maxLoan)+'</strong>.</div>';
     }
   }
+
+  // generic age check for non-car products
   var ageNote='';
-  if(age){
-    var endAge=age+yrs;
-    if(endAge>info.maxAge){
-      ageNote='<div class="elig warn">Loan ends at age '+endAge+'. This product should close by age '+info.maxAge+' - reduce tenure.</div>';
+  if(age && !isCar){
+    var ea=age+yrs;
+    if(ea>info.maxAge){
+      ageNote='<div class="elig warn">Loan ends at age '+ea+'. This product should close by age '+info.maxAge+' - reduce tenure.</div>';
     }
   }
-  box.innerHTML='<div class="badge gold">'+info.name+'</div>'+
-    '<div class="kv"><span>Monthly EMI</span><span></span></div>'+
-    '<div class="big navy">'+fmt(emi)+'</div>'+
-    '<div class="kv"><span>Loan amount</span><span>'+fmt(P)+'</span></div>'+
-    '<div class="kv"><span>Interest rate</span><span>'+info.rate.toFixed(2)+'% p.a.</span></div>'+
-    '<div class="kv"><span>Tenure</span><span>'+yrs+' years ('+n+' EMIs)</span></div>'+
-    '<div class="kv"><span>Total interest</span><span style="color:#A24E15">'+fmt(interest)+'</span></div>'+
-    '<div class="kv"><span>Total repayment</span><span>'+fmt(total)+'</span></div>'+
-    eligBlock+ageNote+
+
+  var html='<div class="badge gold">'+info.name+'</div>';
+
+  if(offerRate===null){
+    // single result at standard rate
+    html+='<div class="kv"><span>Monthly EMI</span><span></span></div>'+
+      '<div class="big navy">'+fmt(base.emi)+'</div>'+
+      '<div class="kv"><span>Loan amount</span><span>'+fmt(P)+'</span></div>'+
+      '<div class="kv"><span>Interest rate</span><span>'+stdRate.toFixed(2)+'% p.a.</span></div>'+
+      '<div class="kv"><span>Tenure</span><span>'+yrs+' years ('+n+' EMIs)</span></div>'+
+      '<div class="kv"><span>Total interest</span><span style="color:#A24E15">'+fmt(base.interest)+'</span></div>'+
+      '<div class="kv"><span>Total repayment</span><span>'+fmt(base.total)+'</span></div>';
+    if(isCar && !cibil){
+      html+='<div class="elig ok">Enter the CIBIL score above to auto-apply the customer\'s band rate.</div>';
+    }
+  } else {
+    // dual result: standard vs offer
+    var off=emiCalc(P, offerRate, n);
+    var emiDiff=base.emi-off.emi;
+    var intDiff=base.interest-off.interest;
+    var cheaper=emiDiff>=0;
+    html+='<div class="loan-compare">'+
+        '<div class="lc-card">'+
+          '<div class="lc-tag">Standard rate</div>'+
+          '<div class="lc-rate">'+stdRate.toFixed(2)+'% p.a.</div>'+
+          '<div class="lc-emi">'+fmt(base.emi)+'</div>'+
+          '<div class="lc-sub">per month</div>'+
+          '<div class="lc-int">Total interest '+fmt(base.interest)+'</div>'+
+        '</div>'+
+        '<div class="lc-card '+(cheaper?'lc-best':'')+'">'+
+          '<div class="lc-tag">'+(hasRoi?'Manual rate':'CIBIL-based offer')+'</div>'+
+          '<div class="lc-rate">'+offerRate.toFixed(2)+'% p.a.</div>'+
+          '<div class="lc-emi">'+fmt(off.emi)+'</div>'+
+          '<div class="lc-sub">per month</div>'+
+          '<div class="lc-int">Total interest '+fmt(off.interest)+'</div>'+
+        '</div>'+
+      '</div>';
+    if(offerLabel){
+      html+='<div class="kv"><span>Rate basis</span><span>'+offerLabel+'</span></div>';
+    }
+    if(Math.abs(emiDiff)>=1){
+      if(cheaper){
+        html+='<div class="elig ok">Customer saves <strong>'+fmt(Math.abs(emiDiff))+'/month</strong> and <strong>'+fmt(Math.abs(intDiff))+'</strong> in total interest at this rate.</div>';
+      } else {
+        html+='<div class="elig warn">This rate is higher than standard: <strong>'+fmt(Math.abs(emiDiff))+'/month</strong> more, <strong>'+fmt(Math.abs(intDiff))+'</strong> extra interest overall.</div>';
+      }
+    }
+    html+='<div class="kv"><span>Loan amount</span><span>'+fmt(P)+'</span></div>'+
+      '<div class="kv"><span>Tenure</span><span>'+yrs+' years ('+n+' EMIs)</span></div>';
+  }
+
+  html+=warnings+eligBlock+ageNote+
     '<div class="print-row"><button class="btn-ghost" onclick="window.print()">Print / Save PDF</button></div>';
+  box.innerHTML=html;
 }
 
 function calcSavings(){
