@@ -223,10 +223,10 @@
         <h2><span class="pip"></span> Loan enquiry</h2>
         <p class="sub">Pick the product, enter income &amp; amount, get EMI + eligibility instantly.</p>
         <label>Loan product</label>
-        <select id="lnType" onchange="calcLoan()"></select>
+        <select id="lnType" onchange="buildTenure();calcLoan()"></select>
         <div class="row">
           <div><label>Customer age</label><input type="number" id="lnAge" placeholder="e.g. 35" oninput="calcLoan()"></div>
-          <div><label>Net monthly income (Rs.)</label><input type="number" id="lnIncome" placeholder="e.g. 60000" oninput="calcLoan()"></div>
+          <div><label>Gross monthly income (Rs.)</label><input type="number" id="lnIncome" placeholder="e.g. 60000" oninput="calcLoan()"></div>
         </div>
         <label>Employment type</label>
         <select id="lnEmp" onchange="calcLoan()">
@@ -255,15 +255,10 @@
         <label>Loan amount required (Rs.)</label>
         <input type="number" id="lnAmt" placeholder="e.g. 2500000" oninput="calcLoan()">
         <label>Tenure (years)</label>
-        <select id="lnTenure" onchange="calcLoan()">
-          <option value="3">3 years</option><option value="5">5 years</option>
-          <option value="7">7 years</option><option value="10">10 years</option>
-          <option value="15" selected>15 years</option><option value="20">20 years</option>
-          <option value="30">30 years</option>
-        </select>
+        <select id="lnTenure" onchange="calcLoan()"></select>
         <label>Existing monthly EMIs / obligations (Rs.)</label>
         <input type="number" id="lnOblig" placeholder="e.g. 0" value="0" oninput="calcLoan()">
-        <div class="hint">Helps check if the new EMI fits within a safe limit of income.</div>
+        <div class="hint">EMI + existing obligations must stay within 50% of gross income.</div>
         <label>Override ROI manually (% p.a.) &mdash; optional</label>
         <input type="number" id="lnRoi" step="0.05" placeholder="e.g. 8.40" oninput="calcLoan()">
         <div class="hint">Overrides everything above, including any auto CIBIL rate. Leave blank to use the standard / CIBIL rate.</div>
@@ -365,6 +360,28 @@ function cibilBand(score){
   return null; // below 680 or invalid -> not in published grid
 }
 
+/* Build the tenure list for the selected product.
+   Car loan: 1-7 years only (84 months max).
+   Others: standard longer ranges. */
+function buildTenure(){
+  var type=document.getElementById('lnType').value;
+  var sel=document.getElementById('lnTenure');
+  var prev=sel.value;
+  var opts=[];
+  if(type==='car'){
+    for(var y=1;y<=7;y++) opts.push(y);
+  } else {
+    opts=[1,2,3,5,7,10,15,20,25,30];
+    var info=loanInfo.find(function(l){ return l.type===type; });
+    if(info) opts=opts.filter(function(y){ return y<=info.maxTenure; });
+  }
+  var def = (type==='car') ? 7 : (opts.indexOf(15)>-1 ? 15 : opts[opts.length-1]);
+  var keep = opts.indexOf(+prev)>-1 ? +prev : def;
+  sel.innerHTML=opts.map(function(y){
+    return '<option value="'+y+'"'+(y===keep?' selected':'')+'>'+y+(y===1?' year':' years')+'</option>';
+  }).join('');
+}
+
 function fmt(n){ return 'Rs.' + Math.round(n).toLocaleString('en-IN'); }
 
 /* ---- tiny CSV parser ---- */
@@ -425,6 +442,7 @@ function buildUI(){
   lnSel.innerHTML=loanInfo.map(function(l){
     return '<option value="'+l.type+'">'+l.name+'</option>';
   }).join('');
+  buildTenure();
   document.getElementById('fdRateTable').innerHTML=
     '<tr><th>Tenure</th><th>General</th><th>Senior (+0.50%)</th></tr>'+
     fdRates.map(function(r){
@@ -564,12 +582,12 @@ function calcLoan(){
     var safeEmi=income*0.50-obligation;
     var ratio=(eligEmi/income)*100;
     if(eligEmi<=safeEmi){
-      eligBlock='<div class="elig ok">Comfortable fit - EMI is '+ratio.toFixed(0)+'% of net income. Within safe limit.</div>';
+      eligBlock='<div class="elig ok">Comfortable fit - EMI is '+ratio.toFixed(0)+'% of gross income. Within the 50% norm.</div>';
     } else {
       var maxEmi=Math.max(income*0.50-obligation,0);
       var rr=eligRate/100/12;
       var maxLoan=maxEmi>0?maxEmi*(Math.pow(1+rr,n)-1)/(rr*Math.pow(1+rr,n)):0;
-      eligBlock='<div class="elig warn">EMI is '+ratio.toFixed(0)+'% of income - above the safe ~50% limit. Eligible loan at this tenure approx <strong>'+fmt(maxLoan)+'</strong>.</div>';
+      eligBlock='<div class="elig warn">EMI is '+ratio.toFixed(0)+'% of gross income - above the 50% norm. Eligible loan at this tenure approx <strong>'+fmt(maxLoan)+'</strong>.</div>';
     }
   }
 
