@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IOB Ready Reckoner - Sales Companion</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B1F3A">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="IOB Reckoner">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
   :root{
     --ink:#0B1F3A;--ink-soft:#1B3559;--gold:#C9A227;--gold-soft:#E8D9A0;
@@ -679,6 +687,13 @@ function calcSavings(){
     '<div class="kv"><span>On avg. balance</span><span>'+fmt(bal)+'</span></div>'+
     (bal>=50000?'<div class="elig ok">Tip: pitch the sweep-in facility - idle balance earns FD-level returns.</div>':'')+
     '<div class="print-row"><button class="btn-ghost" onclick="window.print()">Print / Save PDF</button></div>';
+}
+
+/* ===== PWA: register service worker for home-screen install ===== */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
 }
 
 /* ===== SPLASH CONTROL ===== */
